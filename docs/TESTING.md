@@ -56,19 +56,22 @@ It tests contract **logic**, not the compiled WASM.
 
 ## 2. On-chain checklist (testnet)
 
+Deployed: **`grind-token.testnet`** — [explorer](https://testnet.nearblocks.io/address/grind-token.testnet), owner `callmeaoyama.testnet`.
+Rows without a link are still pending (slashing needs 3 reporters with stakes older than 1 day).
+
 Deploy to a **fresh** account (see README), then record each tx hash with an
 explorer link in the table below.
 
 | # | Scenario | Expected | Tx / explorer link |
 |---|---|---|---|
-| 1 | deploy + init in one tx | `ft_mint` event, owner has 1e27 raw | |
-| 2 | `storage_deposit` (0.01 NEAR) for 4 test accounts | registered; check contract `storage_usage` delta ≤ 1000 bytes per account | |
-| 3 | `ft_transfer` 1000 GRIND | receiver +995, supply −5, `ft_burn` event | |
-| 4 | `ft_transfer` with 0 deposit | panic: 1 yoctoNEAR | |
-| 5 | `ft_transfer` to unregistered | panic: not registered | |
-| 6 | `stake_agent` 3 reporters + 1 target | `stake` events | |
-| 7 | `unstake_agent` with `"-1"` | panic: Invalid amount | |
+| 1 | deploy + init in one tx | `ft_mint` event, owner has 1e27 raw | [`hhQMKygy…`](https://testnet.nearblocks.io/txns/hhQMKygywNZTgoHYYD9Ftn5C2TVADamKT9EaLSX138B) ✅ |
+| 2 | `storage_deposit` (0.01 NEAR) for 4 test accounts | registered; check contract `storage_usage` delta ≤ 1000 bytes per account | [`CvADz4wM…`](https://testnet.nearblocks.io/txns/CvADz4wM5xHzvMuZNQPHhVxT3rYfHUmzFUpGcPBBf2kK) ✅ (1 account so far) |
+| 3 | `ft_transfer` 1000 GRIND | receiver +995, supply −5, `ft_burn` event | [`ETaNLgmp…`](https://testnet.nearblocks.io/txns/ETaNLgmpfnC7TqzFtQihtCbiL9GUFmQp87moJhTczooC) ✅ receiver got 995, supply −5 |
+| 4 | `ft_transfer` with 0 deposit | panic: 1 yoctoNEAR | ✅ panicked: `Requires attached deposit of exactly 1 yoctoNEAR` |
+| 5 | `ft_transfer` to unregistered | panic: not registered | ✅ panicked: `not registered` |
+| 6 | `stake_agent` 3 reporters + 1 target | `stake` events | [`Dou9eSmE…`](https://testnet.nearblocks.io/txns/Dou9eSmEWtJXCuNFM4RtK1kZN8BBTyuNrV8dYXFAnmQo) ✅ (1 agent so far) |
+| 7 | `unstake_agent` with `"-1"` | panic: Invalid amount | ✅ panicked: `Invalid amount: must be a non-negative integer string` |
 | 8 | 3× `report_agent` after 1 day | 3rd tx emits `slash` | |
 | 9 | 4th report same week | panic: cooldown | |
-| 10 | `trigger_ritual` | `ritual` event, treasury burn if applicable | |
+| 10 | `trigger_ritual` | `ritual` event, treasury burn if applicable | [`5gm3JtsR…`](https://testnet.nearblocks.io/txns/5gm3JtsRsq2sag8kMHagaDDT5xjxzgwByZy1HEVmibZw) ✅ ritual #1 (first ritual, treasury empty → 0 burned) |
 | 11 | `ft_transfer_call` to a contract implementing `ft_on_transfer` | refund path works | |

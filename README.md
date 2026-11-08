@@ -40,6 +40,10 @@ npm test          # unit tests (mocked runtime), 49 cases incl. regression + fuz
 npm run build     # -> build/contract.wasm
 ```
 
+## Live on testnet
+
+Contract: **`grind-token.testnet`** — [explorer](https://testnet.nearblocks.io/address/grind-token.testnet). Tx log: [`docs/TESTING.md`](docs/TESTING.md).
+
 ## Deploy (testnet)
 
 Use a **fresh** account. Deploy and init in a single transaction so nobody can
