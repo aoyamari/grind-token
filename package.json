@@ -1,0 +1,18 @@
+{
+  "name": "grind-token",
+  "version": "0.2.1",
+  "description": "$GRIND — Agent Utility Memecoin on NEAR (burn-on-transfer, agent staking, quorum slashing, weekly treasury-burn ritual)",
+  "type": "module",
+  "main": "src/contract.js",
+  "scripts": {
+    "build": "near-sdk-js build src/contract.js build/contract.wasm",
+    "test": "node test/contract.test.cjs"
+  },
+  "dependencies": {
+    "near-sdk-js": "2.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
