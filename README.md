@@ -46,9 +46,9 @@ Built with [`near-sdk-js`](https://github.com/near/near-sdk-js) 2.0.0 (`MIT AND 
 
 Contract: **`grind-token.testnet`** — [explorer](https://testnet.nearblocks.io/address/grind-token.testnet). Tx log: [`docs/TESTING.md`](docs/TESTING.md).
 
-That account is still the **v0.2.1** WASM (`code_hash` `DXYwRKmB47KoYcfL7kYjToCVZxN8VeEkmzctD7GdoZBu`). It does not include the 7-day rate floor in the ritual mechanic above. Its first ritual closed a 129-second epoch that burned 5 GRIND, so the next call burns treasury only if this epoch burns more than 23,503.19 GRIND (about 4.70 million GRIND transferred). One full-access key is still on the account. Redeploy v0.2.2, then remove that key, to pick up the fix.
+Running **v0.2.2** since 10 Nov 2026 (redeploy tx [`3SzGB6TS…`](https://testnet.nearblocks.io/txns/3SzGB6TSdKEpV4DYWkTXn9FiyysRhZmY5NeCJUwgSWTW), `code_hash` `9zFpLktfJvp6knye2KpcF8jbNecPGQXDky9DZ6K4RScv`). The upgrade kept all balances, stakes and the treasury; the previous v0.2.1 code (`DXYwRKmB…`) ran the earlier tx log. Ritual #1 closed a 129-second epoch, which v0.2.2 now scores as a 7-day epoch, so the treasury burn is reachable again. One full-access key is still on the account.
 
-**Ritual #2 is open to anyone, judges included.** It unlocks 7 days after ritual #1 ([`5gm3JtsR…`](https://testnet.nearblocks.io/txns/5gm3JtsRsq2sag8kMHagaDDT5xjxzgwByZy1HEVmibZw), 8 Nov 2026), i.e. around 15 Nov 2026 UTC. Check `get_ritual_status` first: `next_ritual_in` shows the time left, `additional_burn_needed` shows how much more organic burn this epoch needs, and `treasury_burn_if_called_now` shows what calling `trigger_ritual` would burn.
+**Ritual #2 is open to anyone, judges included.** It unlocks 7 days after ritual #1 ([`5gm3JtsR…`](https://testnet.nearblocks.io/txns/5gm3JtsRsq2sag8kMHagaDDT5xjxzgwByZy1HEVmibZw), 8 Nov 2026), i.e. 15 Nov 2026, 01:50 UTC. Check `get_ritual_status` first: `next_ritual_in` shows the time left, `additional_burn_needed` shows how much more organic burn this epoch needs, and `treasury_burn_if_called_now` shows what calling `trigger_ritual` would burn.
 
 ## Deploy (testnet)
 
