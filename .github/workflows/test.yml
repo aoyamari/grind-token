@@ -8,5 +8,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      # unit tests mock the near runtime, so no SDK install is needed
+      - run: npm ci
       - run: npm test
+      - run: npm run build
