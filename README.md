@@ -150,6 +150,10 @@ This is hackathon code and has **not been professionally audited**.
 - Unit tests run against a mocked runtime; see [docs/TESTING.md](docs/TESTING.md)
   for the on-chain test checklist.
 
+## Attribution
+
+AI-written code is allowed in this hackathon if the README says so. Claude wrote the v0.2.1 contract, tests, and docs. Cursor wrote the v0.2.2 fixes. The only library is near-sdk-js 2.0.0, named above. This repo is not a pre-hackathon product.
+
 ## License
 
 MIT
