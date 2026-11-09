@@ -48,6 +48,8 @@ Contract: **`grind-token.testnet`** — [explorer](https://testnet.nearblocks.io
 
 That account is still the **v0.2.1** WASM (`code_hash` `DXYwRKmB47KoYcfL7kYjToCVZxN8VeEkmzctD7GdoZBu`). It does not include the 7-day rate floor in the ritual mechanic above. Its first ritual closed a 129-second epoch that burned 5 GRIND, so the next call burns treasury only if this epoch burns more than 23,503.19 GRIND (about 4.70 million GRIND transferred). One full-access key is still on the account. Redeploy v0.2.2, then remove that key, to pick up the fix.
 
+**Ritual #2 is open to anyone, judges included.** It unlocks 7 days after ritual #1 ([`5gm3JtsR…`](https://testnet.nearblocks.io/txns/5gm3JtsRsq2sag8kMHagaDDT5xjxzgwByZy1HEVmibZw), 8 Nov 2026), i.e. around 15 Nov 2026 UTC. Check `get_ritual_status` first: `next_ritual_in` shows the time left, `additional_burn_needed` shows how much more organic burn this epoch needs, and `treasury_burn_if_called_now` shows what calling `trigger_ritual` would burn.
+
 ## Deploy (testnet)
 
 Use a **fresh** account. Deploy and init in a single transaction so nobody can
@@ -152,7 +154,7 @@ This is hackathon code and has **not been professionally audited**.
 
 ## Attribution
 
-AI-written code is allowed in this hackathon if the README says so. Claude wrote the v0.2.1 contract, tests, and docs. Cursor wrote the v0.2.2 fixes. The only library is near-sdk-js 2.0.0, named above. This repo is not a pre-hackathon product.
+Built during NEAR Hackathon (Nov 2026). AI-assisted: Claude reviewed and patched v0.2 → v0.2.1, and Cursor Agent wrote the v0.2.2 fixes. The only library is near-sdk-js 2.0.0, named above.
 
 ## License
 
