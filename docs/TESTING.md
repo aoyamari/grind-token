@@ -57,7 +57,7 @@ It tests contract **logic**, not the compiled WASM.
 ## 2. On-chain checklist (testnet)
 
 Deployed: **`grind-token.testnet`** — [explorer](https://testnet.nearblocks.io/address/grind-token.testnet), owner `callmeaoyama.testnet`.
-Rows without a link are still pending (slashing needs 3 reporters with stakes older than 1 day).
+All on-chain scenarios executed.
 
 Deploy to a **fresh** account (see README), then record each tx hash with an
 explorer link in the table below.
@@ -71,7 +71,7 @@ explorer link in the table below.
 | 5 | `ft_transfer` to unregistered | panic: not registered | ✅ panicked: `not registered` |
 | 6 | `stake_agent` 3 reporters + 1 target | `stake` events | [`Dou9eSmE…`](https://testnet.nearblocks.io/txns/Dou9eSmEWtJXCuNFM4RtK1kZN8BBTyuNrV8dYXFAnmQo) ✅ target `grindtopup` + reporters [`Dpt21aLK…`](https://testnet.nearblocks.io/txns/Dpt21aLKQtpsadSHsTMXfUMFoj9gbzfKZRxXsaL6uNvM), [`b7Udu2dw…`](https://testnet.nearblocks.io/txns/b7Udu2dwhxVZq3VcAKoDPfEcY9jXAdrMcp5D8tKLC22), [`A23EiUxE…`](https://testnet.nearblocks.io/txns/A23EiUxEK8p2sKzzWYQZp8cVZVXwu2Wj43wtuQqb9GPG) |
 | 7 | `unstake_agent` with `"-1"` | panic: Invalid amount | ✅ panicked: `Invalid amount: must be a non-negative integer string` |
-| 8 | 3× `report_agent` after 1 day | 3rd tx emits `slash` | |
-| 9 | 4th report same week | panic: cooldown | |
+| 8 | 3× `report_agent` after 1 day | 3rd tx emits `slash` | ✅ target `grindtopup` (100 GRIND) slashed 10 → 5 burned, 5 treasury: [`69ecf8nw…`](https://testnet.nearblocks.io/txns/69ecf8nwQ5ankypxx6nbk6KmUtJCqsvQLVE43Ukxxtsg), [`7cLZGLej…`](https://testnet.nearblocks.io/txns/7cLZGLejLHYG38jdBSAxAJrZQPTaWBZoQzV8qxgdrnYe), [`5wYWGZ2f…`](https://testnet.nearblocks.io/txns/5wYWGZ2fm6bwpHrNr7yRTGsWa6asm8KN7gsyyxyq28vY) |
+| 9 | 4th report same week | panic: cooldown | ✅ panicked: `Target was slashed recently (7-day cooldown)` |
 | 10 | `trigger_ritual` | `ritual` event, treasury burn if applicable | [`5gm3JtsR…`](https://testnet.nearblocks.io/txns/5gm3JtsRsq2sag8kMHagaDDT5xjxzgwByZy1HEVmibZw) ✅ ritual #1 (first ritual, treasury empty → 0 burned) |
 | 11 | `ft_transfer_call` to a contract implementing `ft_on_transfer` | refund path works | ✅ receiver `grind-receiver.testnet` ([source](../test/ft-receiver.js)), 100 GRIND each: keep [`5gvpTmYr…`](https://testnet.nearblocks.io/txns/5gvpTmYrjf36qUgsdcLx9UdVSn8tjWQwan5pe2RRfujn) (unused 0), half [`ETVy5xhv…`](https://testnet.nearblocks.io/txns/ETVy5xhvCmRuJGstVuSmfZChG6Hoq4CELDfDRw34yKjX) (49.75 refunded), refund [`GB1JcQmB…`](https://testnet.nearblocks.io/txns/GB1JcQmBzSkCFZ7gyaEU4VkGtYZZWMJms5nsBjAfm2pU) (99.5 refunded), receiver panic [`BVJ4eLkK…`](https://testnet.nearblocks.io/txns/BVJ4eLkKyAty6Svprp9C3f7EdbjtsVsSigCcqjBVSef4) (99.5 refunded). 0.5% burn is kept on refunds. 100 TGas → `More gas is required` |
