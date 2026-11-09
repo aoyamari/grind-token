@@ -68,9 +68,8 @@ It tests contract **logic**, not the compiled WASM.
 
 Deployed: **`grind-token.testnet`** — [explorer](https://testnet.nearblocks.io/address/grind-token.testnet), owner `callmeaoyama.testnet`.
 Rows 1–11 ran on v0.2.1. Upgraded in place to v0.2.2 on 10 Nov 2026: [`3SzGB6TS…`](https://testnet.nearblocks.io/txns/3SzGB6TSdKEpV4DYWkTXn9FiyysRhZmY5NeCJUwgSWTW) (`code_hash` `9zFpLktf…`). After the upgrade `get_ritual_status` returned `rate_ahead: true`, `additional_burn_needed: 0` (22 GRIND burned this epoch vs. 5 GRIND last epoch, both scored over 7 days).
-This deployment is the **v0.2.1** WASM (`code_hash` `DXYwRKmB47KoYcfL7kYjToCVZxN8VeEkmzctD7GdoZBu`). The v0.2.2 rate floor and grace fix are not on this account until it is redeployed.
 
-Ritual #1 (`5gm3JtsR…`, 2026-11-08 01:50:38 UTC) ran **before** the slash (2026-11-09 02:16 UTC). The table below is the scenario list, not chronological order. That ritual closed a 128.66s epoch with 5 GRIND burned and an empty treasury, so `treasury_burned` was 0. On this v0.2.1 code the next ritual burns treasury only if the current epoch burns more than 23,503.19 GRIND.
+Ritual #1 (`5gm3JtsR…`, 2026-11-08 01:50:38 UTC) ran **before** the slash (2026-11-09 02:16 UTC). The table below is the scenario list, not chronological order. That ritual closed a 128.66s epoch with 5 GRIND burned and an empty treasury, so `treasury_burned` was 0. Under v0.2.1 that short epoch would have required more than 23,503.19 GRIND burned to trigger a treasury burn; v0.2.2 scores it as 7 days, which is why `additional_burn_needed` is 0 after the upgrade. The first on-chain treasury burn is expected at ritual #2 (from 2026-11-15 01:50 UTC).
 
 Scenarios 4, 5, 7, and 9 panicked as recorded, and those four calls were not given transaction hashes here.
 
