@@ -6,8 +6,9 @@
 //   2. Agent staking -> reputasi
 //   3. Slash berbasis quorum (3 agent berbeda harus lapor dalam 3 hari)
 //      -> 50% dibakar, 50% masuk treasury
-//   4. Ritual mingguan: kalau burn organik minggu ini > minggu lalu,
-//      10% treasury dibakar ("treasury burn")
+//   4. Ritual mingguan: kalau LAJU burn organik epoch ini > epoch lalu,
+//      10% treasury dibakar. Durasi di bawah 7 hari dihitung sebagai 7 hari
+//      supaya ritual pertama yang terlalu cepat tidak mengunci baseline.
 //
 // Standar: NEP-141 (FT core + ft_transfer_call), NEP-145 (storage),
 //          NEP-148 (metadata), NEP-297 (events)
@@ -40,6 +41,14 @@ const SLASH_COOLDOWN  = 7n * DAY_NS;               // target nggak bisa di-slash
 const REPORTER_MIN_AGE = 1n * DAY_NS;              // stake reporter min. 1 hari
 const UNSTAKE_GRACE   = 1n * DAY_NS;               // jeda setelah laporan kadaluarsa: target bebas unstake
 const MAX_EVIDENCE    = 280;
+
+// Epoch yang lebih pendek dari interval ritual hanya mungkin pada pemanggilan
+// pertama. Menilai laju dengan lantai 7 hari menutup baseline yang mustahil
+// dikalahkan, tanpa membuat penundaan ritual menjadi lebih mudah.
+function rateDuration(dur) {
+  const d = dur > 0n ? dur : 1n;
+  return d < RITUAL_NS ? RITUAL_NS : d;
+}
 const MAX_MEMO        = 256;
 
 // NEP-145: deposit tetap, cukup buat balance + stake record + report record.
@@ -397,8 +406,9 @@ class GrindToken {
     emit('grind', '1.0.0', 'stake', [{ agent_id: agent, amount: amt.toString(), total: s.amount }]);
   }
 
-  @call({})
+  @call({ payableFunction: true })
   unstake_agent({ amount }) {
+    assertOneYocto();
     const agent = near.predecessorAccountId();
     const self  = near.currentAccountId();
     const amt   = parseAmount(amount);
@@ -407,17 +417,19 @@ class GrindToken {
     assert(s !== null, 'No active stake');
     const cur = BigInt(s.amount);
     assert(cur >= amt, 'Not enough staked');
+    const left = cur - amt;
 
-    // anti kabur: nggak bisa unstake kalau lagi ada laporan aktif
+    // anti kabur: nggak bisa unstake kalau jendela laporan belum habis.
+    // Unstake parsial tidak menghapus catatan, supaya grace 1 hari tetap
+    // menahan ronde laporan baru. Hapus hanya saat stake benar-benar keluar.
     const r = read(K.rpt(agent));
     if (r !== null) {
       const rep = JSON.parse(r);
       assert(near.blockTimestamp() - BigInt(rep.since) >= REPORT_WINDOW,
         'Pending reports against you; wait until the report window expires');
-      remove(K.rpt(agent));
+      if (left === 0n) remove(K.rpt(agent));
     }
 
-    const left = cur - amt;
     assert(left === 0n || left >= MIN_STAKE, 'Remaining stake must be 0 or >= 100 $GRIND');
 
     if (left === 0n) {
@@ -490,6 +502,8 @@ class GrindToken {
     const toTreasury = slash - burn;
 
     ts.amount      = (staked - slash).toString();
+    // Sisa boleh jatuh di bawah MIN_STAKE. Akun tetap agent dan masih bisa
+    // di-slash, tetapi tidak bisa lapor sampai top-up ke 100 GRIND.
     ts.last_slash  = now.toString();
     ts.slash_count = (ts.slash_count || 0) + 1;
     write(K.stk(agent_id), JSON.stringify(ts));
@@ -515,11 +529,12 @@ class GrindToken {
 
     // Bandingkan LAJU burn (burn / durasi), bukan total, supaya pemanggil nggak
     // bisa "menang" cuma dengan nunda ritual biar epoch-nya lebih panjang.
-    //   cur / curDur > last / lastDur  <=>  cur * lastDur > last * curDur
-    const curDur = now - this.epochStart > 0n ? now - this.epochStart : 1n;
-    const burnUp = this.lastRitual > 0n
-      ? this.curEpochBurn * this.lastEpochDur > this.lastEpochBurn * curDur
-      : this.curEpochBurn > 0n;
+    // Durasi di bawah 7 hari dinaikkan ke 7 hari (rateDuration).
+    //   cur / rate(curDur) > last / rate(lastDur)
+    //     <=>  cur * rate(lastDur) > last * rate(curDur)
+    const rate = this._rateAhead(now);
+    const curDur = rate.curDur;
+    const burnUp = rate.ahead;
 
     let ritualBurn = 0n;
     if (burnUp && this.treasury > 0n) {
@@ -537,6 +552,8 @@ class GrindToken {
       previous_epoch_burn: this.lastEpochBurn.toString(),
       epoch_duration_ns: curDur.toString(),
       previous_epoch_duration_ns: this.lastEpochDur.toString(),
+      rate_duration_ns: rateDuration(curDur).toString(),
+      previous_rate_duration_ns: (this.lastRitual > 0n ? rate.prevDur : 0n).toString(),
       treasury_burned: ritualBurn.toString(),
     }]);
 
@@ -569,14 +586,49 @@ class GrindToken {
   @view({})
   get_agent_count() { return this.agentCount; }
 
+  // Laju yang dipakai ritual. Durasi aktual tetap disimpan apa adanya.
+  _rateAhead(now) {
+    const curDur = now - this.epochStart > 0n ? now - this.epochStart : 1n;
+    if (this.lastRitual === 0n) {
+      return {
+        curDur,
+        prevDur: 0n,
+        ahead: this.curEpochBurn > 0n,
+        needed: this.curEpochBurn > 0n ? 0n : 1n,
+      };
+    }
+    const prevDur = rateDuration(this.lastEpochDur);
+    const curRateDur = rateDuration(curDur);
+    const ahead = this.curEpochBurn * prevDur > this.lastEpochBurn * curRateDur;
+    const need = this.lastEpochBurn * curRateDur / prevDur + 1n;
+    return {
+      curDur,
+      prevDur,
+      ahead,
+      needed: this.curEpochBurn >= need ? 0n : need - this.curEpochBurn,
+    };
+  }
+
   @view({})
   get_ritual_status() {
     const now = near.blockTimestamp();
     const elapsed = now - this.lastRitual;
+    const ready = this.lastRitual === 0n || elapsed >= RITUAL_NS;
+    const rate = this._rateAhead(now);
+    let treasuryBurn = 0n;
+    if (ready && rate.ahead && this.treasury > 0n) {
+      treasuryBurn = this.treasury * RITUAL_BURN_PCT / 100n;
+    }
     return {
       last_ritual_time: this.lastRitual.toString(),
       ritual_count: this.ritualCount,
-      next_ritual_in: this.lastRitual === 0n || elapsed >= RITUAL_NS ? '0' : (RITUAL_NS - elapsed).toString(),
+      next_ritual_in: ready ? '0' : (RITUAL_NS - elapsed).toString(),
+      ritual_ready: ready,
+      rate_ahead: rate.ahead,
+      additional_burn_needed: rate.needed.toString(),
+      treasury_burn_if_called_now: treasuryBurn.toString(),
+      rate_duration_ns: rateDuration(rate.curDur).toString(),
+      previous_rate_duration_ns: (this.lastRitual === 0n ? 0n : rate.prevDur).toString(),
       last_epoch_burn: this.lastEpochBurn.toString(),
       last_epoch_duration_ns: this.lastEpochDur.toString(),
       current_epoch_burn: this.curEpochBurn.toString(),
@@ -606,6 +658,7 @@ class GrindToken {
       slash_quorum: SLASH_QUORUM,
       report_window_ns: REPORT_WINDOW.toString(),
       slash_cooldown_ns: SLASH_COOLDOWN.toString(),
+      reporter_min_age_ns: REPORTER_MIN_AGE.toString(),
       unstake_grace_ns: UNSTAKE_GRACE.toString(),
       ritual_interval_ns: RITUAL_NS.toString(),
       ritual_burn_pct: RITUAL_BURN_PCT.toString(),

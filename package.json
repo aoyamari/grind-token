@@ -1,6 +1,6 @@
 {
   "name": "grind-token",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "$GRIND — Agent Utility Memecoin on NEAR (burn-on-transfer, agent staking, quorum slashing, weekly treasury-burn ritual)",
   "type": "module",
   "main": "src/contract.js",

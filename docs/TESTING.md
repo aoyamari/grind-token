@@ -12,7 +12,7 @@ npm test
 the `near` API (storage, predecessor, deposit, gas, block time, promises, logs).
 It tests contract **logic**, not the compiled WASM.
 
-49 cases covering:
+54 cases covering:
 
 - init, metadata shape (object, 18 decimals)
 - NEP-145 registration, refunds, unregister with/without `force`, deposit covers worst-case storage
@@ -21,12 +21,14 @@ It tests contract **logic**, not the compiled WASM.
   self-transfer, vault protection, 0.5% burn reducing total supply
 - `ft_transfer_call` / `ft_resolve_transfer`: net amount forwarded, partial
   refund, full refund on failure, capping a bogus `unused` value, remaining gas forwarded
-- staking: min stake, top-up, partial/full unstake, storage actually removed
+- staking: min stake, top-up, partial/full unstake, 1 yocto on unstake, storage actually removed
 - slashing: quorum of 3, no duplicate reporters, 3-day report expiry, 7-day
   cooldown, reporter age, self-report, evidence limits, no unstake while reported,
-  1-day grace period after an expired report round
+  1-day grace period after an expired report round, partial unstake does not cancel grace,
+  slash may leave stake under 100 GRIND
 - ritual: 7-day cooldown, treasury burn only when the organic burn *rate* grows,
-  epoch durations recorded, ritual burn excluded from next epoch's target
+  epochs shorter than 7 days are scored as 7 days, `get_ritual_status` reports whether
+  a call now would burn, epoch durations recorded, ritual burn excluded from next epoch's target
 - **invariants** after every step of a 200-operation random run:
   `Σ balances == total_supply`, `vault == staked + treasury`,
   `total_supply + burned == initial_supply`
@@ -54,10 +56,24 @@ It tests contract **logic**, not the compiled WASM.
 | Ritual compared total burn of epochs with different lengths, so whoever called it could just wait until the target was beaten | `laju burn turun -> treasury nggak dibakar …` |
 | `ft_transfer_call` forwarded a fixed 50 TGas to the receiver, too little for some DEX flows | `sisa gas diteruskan ke ft_on_transfer` |
 
+### Regression tests for bugs found in v0.2.1
+
+| Bug in v0.2.1 | Test |
+|---|---|
+| A partial unstake during the grace day deleted the report record, so a new report round could start immediately | `REGRESI: unstake parsial tidak membatalkan grace` |
+| The first ritual could close a few-second epoch and freeze a burn rate the next week could not beat | `REGRESI: epoch pertama yang sangat pendek tidak mengunci laju` |
+| `unstake_agent` did not require 1 yoctoNEAR | `unstake wajib 1 yoctoNEAR` |
+
 ## 2. On-chain checklist (testnet)
 
 Deployed: **`grind-token.testnet`** — [explorer](https://testnet.nearblocks.io/address/grind-token.testnet), owner `callmeaoyama.testnet`.
-All on-chain scenarios executed.
+This deployment is the **v0.2.1** WASM (`code_hash` `DXYwRKmB47KoYcfL7kYjToCVZxN8VeEkmzctD7GdoZBu`). The v0.2.2 rate floor and grace fix are not on this account until it is redeployed.
+
+Ritual #1 (`5gm3JtsR…`, 2026-11-08 01:50:38 UTC) ran **before** the slash (2026-11-09 02:16 UTC). The table below is the scenario list, not chronological order. That ritual closed a 128.66s epoch with 5 GRIND burned and an empty treasury, so `treasury_burned` was 0. On this v0.2.1 code the next ritual burns treasury only if the current epoch burns more than 23,503.19 GRIND.
+
+Scenarios 4, 5, 7, and 9 panicked as recorded, and those four calls were not given transaction hashes here.
+
+All other on-chain scenarios below were executed. The hashes were checked against archival testnet RPC.
 
 Deploy to a **fresh** account (see README), then record each tx hash with an
 explorer link in the table below.

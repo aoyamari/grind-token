@@ -112,6 +112,13 @@ test('owner == akun kontrak ditolak', () => {
   reset(); c = new GrindToken();
   A.throws(() => as(SELF).init({ owner_id: SELF }), /must not be the contract/);
 });
+test('get_config memuat umur minimum reporter', () => {
+  fresh();
+  const cfg = c.get_config();
+  A.equal(cfg.reporter_min_age_ns, DAY.toString());
+  A.equal(cfg.ritual_interval_ns, (7n * DAY).toString());
+  A.equal(cfg.burn_bp, '50');
+});
 test('ft_metadata return object (bukan string) + decimals 18', () => {
   fresh();
   const m = c.ft_metadata();
@@ -273,15 +280,20 @@ test('top-up stake nambah agentCount cuma sekali', () => {
 });
 test('REGRESI: unstake amount negatif ditolak (dulu bisa mint stake & reputasi)', () => {
   fresh(); agents(['eve.testnet'], 100);
-  A.throws(() => as('eve.testnet').unstake_agent({ amount: '-999999999999' }), /Invalid amount/);
+  A.throws(() => yocto('eve.testnet').unstake_agent({ amount: '-999999999999' }), /Invalid amount/);
   A.equal(c.get_agent_info({ agent_id: 'eve.testnet' }).amount, G(100));
   invariant();
 });
+test('unstake wajib 1 yoctoNEAR', () => {
+  fresh(); agents(['alice.testnet'], 300);
+  A.throws(() => as('alice.testnet', 0n).unstake_agent({ amount: G(100) }), /1 yoctoNEAR/);
+  A.equal(c.get_agent_info({ agent_id: 'alice.testnet' }).amount, G(300));
+});
 test('unstake parsial & penuh', () => {
   fresh(); agents(['alice.testnet'], 300);
-  as('alice.testnet').unstake_agent({ amount: G(100) });
+  yocto('alice.testnet').unstake_agent({ amount: G(100) });
   A.equal(c.get_agent_info({ agent_id: 'alice.testnet' }).amount, G(200));
-  as('alice.testnet').unstake_agent({ amount: G(200) });
+  yocto('alice.testnet').unstake_agent({ amount: G(200) });
   A.equal(c.get_agent_info({ agent_id: 'alice.testnet' }), null);
   A.equal(storage.has('stk:alice.testnet'), false, 'storageRemove, bukan string kosong');
   A.equal(c.get_agent_count(), 0);
@@ -289,12 +301,12 @@ test('unstake parsial & penuh', () => {
 });
 test('sisa stake di bawah minimum ditolak', () => {
   fresh(); agents(['alice.testnet'], 150);
-  A.throws(() => as('alice.testnet').unstake_agent({ amount: G(100) }), /Remaining stake/);
+  A.throws(() => yocto('alice.testnet').unstake_agent({ amount: G(100) }), /Remaining stake/);
 });
 test('unstake lebih dari stake / tanpa stake ditolak', () => {
   fresh(); agents(['alice.testnet'], 100); register('bob.testnet');
-  A.throws(() => as('alice.testnet').unstake_agent({ amount: G(101) }), /Not enough staked/);
-  A.throws(() => as('bob.testnet').unstake_agent({ amount: G(1) }), /No active stake/);
+  A.throws(() => yocto('alice.testnet').unstake_agent({ amount: G(101) }), /Not enough staked/);
+  A.throws(() => yocto('bob.testnet').unstake_agent({ amount: G(1) }), /No active stake/);
 });
 
 section('Report & slash (quorum)');
@@ -357,9 +369,9 @@ test('evidence kosong / kepanjangan ditolak', () => {
 test('target nggak bisa kabur (unstake) selagi ada laporan aktif', () => {
   fresh(); agents(['target.testnet', 'a1.testnet']);
   as('a1.testnet').report_agent({ agent_id: 'target.testnet', evidence: 'x' });
-  A.throws(() => as('target.testnet').unstake_agent({ amount: G(1000) }), /Pending reports/);
+  A.throws(() => yocto('target.testnet').unstake_agent({ amount: G(1000) }), /Pending reports/);
   advance(3);
-  as('target.testnet').unstake_agent({ amount: G(1000) });
+  yocto('target.testnet').unstake_agent({ amount: G(1000) });
   invariant();
 });
 
@@ -368,7 +380,7 @@ test('REGRESI: 1 griefer nggak bisa ngunci unstake selamanya (grace 1 hari)', ()
   as('eve.testnet').report_agent({ agent_id: 'target.testnet', evidence: 'x' });
   advance(3);
   A.throws(() => as('eve.testnet').report_agent({ agent_id: 'target.testnet', evidence: 'x' }), /grace period/);
-  as('target.testnet').unstake_agent({ amount: G(1000) });
+  yocto('target.testnet').unstake_agent({ amount: G(1000) });
   A.equal(c.get_agent_info({ agent_id: 'target.testnet' }), null);
   invariant();
 });
@@ -378,6 +390,28 @@ test('setelah grace habis, ronde laporan baru boleh dimulai', () => {
   advance(4);
   const r = as('eve.testnet').report_agent({ agent_id: 'target.testnet', evidence: 'x' });
   A.equal(r.reports, 1);
+});
+test('REGRESI: unstake parsial tidak membatalkan grace', () => {
+  fresh(); agents(['target.testnet', 'eve.testnet']);
+  as('eve.testnet').report_agent({ agent_id: 'target.testnet', evidence: 'x' });
+  advance(3);
+  yocto('target.testnet').unstake_agent({ amount: G(1) });
+  A.equal(c.get_agent_info({ agent_id: 'target.testnet' }).amount, G(999));
+  A.throws(() => as('eve.testnet').report_agent({ agent_id: 'target.testnet', evidence: 'lagi' }), /grace period/);
+  advance(1);
+  const r = as('eve.testnet').report_agent({ agent_id: 'target.testnet', evidence: 'ronde baru' });
+  A.equal(r.reports, 1);
+  A.equal(r.slashed, false);
+});
+test('slash boleh sisakan stake < 100; tetap agent, tidak bisa lapor', () => {
+  fresh(); agents(['target.testnet', ...A3], 100);
+  for (const a of A3) as(a).report_agent({ agent_id: 'target.testnet', evidence: 'x' });
+  const t = c.get_agent_info({ agent_id: 'target.testnet' });
+  A.equal(t.amount, G(90));
+  A.equal(t.reputation, '0');
+  A.equal(c.get_agent_count(), 4);
+  A.throws(() => as('target.testnet').report_agent({ agent_id: 'a1.testnet', evidence: 'x' }), /Only agents/);
+  invariant();
 });
 
 section('Ritual mingguan');
@@ -447,6 +481,26 @@ test('treasury burn tetap jalan kalau laju burn naik', () => {
   A.equal(r.treasury_burned, G(5));
   invariant();
 });
+test('REGRESI: epoch pertama yang sangat pendek tidak mengunci laju', () => {
+  fresh();
+  register('burner.testnet');
+  yocto('owner.testnet').ft_transfer({ receiver_id: 'burner.testnet', amount: G(1000) }); // bakar 5, durasi ~0
+  const first = c.trigger_ritual();
+  A.equal(first.treasury_burned, '0');
+  A.equal(c.get_ritual_status().last_epoch_duration_ns, '1'); // durasi aktual tetap jujur
+  A.equal(c.get_ritual_status().previous_rate_duration_ns, (7n * DAY).toString());
+  agents(['target.testnet', ...A3], 100); // +2 hari, lalu slash di epoch ini
+  for (const a of A3) as(a).report_agent({ agent_id: 'target.testnet', evidence: 'x' });
+  advance(5); // epoch ini jadi 7 hari; bakar slash 5 GRIND > baseline 5 GRIND / 7 hari
+  const st = c.get_ritual_status();
+  A.equal(st.ritual_ready, true);
+  A.equal(st.rate_ahead, true);
+  A.equal(st.additional_burn_needed, '0');
+  A.equal(st.treasury_burn_if_called_now, (ONE / 2n).toString());
+  const r = c.trigger_ritual();
+  A.equal(r.treasury_burned, (ONE / 2n).toString()); // 10% dari treasury slash 5 GRIND
+  invariant();
+});
 test('laju burn turun -> treasury nggak dibakar walau totalnya lebih besar', () => {
   fresh(); agents(['target.testnet', ...A3]);
   for (const a of A3) as(a).report_agent({ agent_id: 'target.testnet', evidence: 'x' }); // treasury 50
@@ -472,7 +526,7 @@ test('200 operasi acak -> sum(balances) == total_supply', () => {
       switch (rnd(5)) {
         case 0: yocto(u).ft_transfer({ receiver_id: v, amount: amt }); break;
         case 1: as(u).stake_agent({ amount: amt }); break;
-        case 2: as(u).unstake_agent({ amount: amt }); break;
+        case 2: yocto(u).unstake_agent({ amount: amt }); break;
         case 3: as(u).report_agent({ agent_id: v, evidence: 'fuzz' }); break;
         case 4: advance(1); try { c.trigger_ritual(); } catch (_) {} break;
       }
